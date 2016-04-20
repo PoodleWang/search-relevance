@@ -309,11 +309,12 @@ def extract(train, test):
 
     return train, y_train, test, y_test
 
-if __name__ == '__main__':
+ if __name__ == '__main__':
 
     # Load the training file
     train = pd.read_csv('input/train.csv').fillna("")
     test = pd.read_csv('input/test.csv').fillna("")
+
 
     #Extract data for StratifiedKFold analysis
     #and add the resulting sets of training/test
@@ -325,23 +326,23 @@ if __name__ == '__main__':
     kf = StratifiedKFold(train["query"], n_folds=5)
 
     for train_index, test_index in kf:
-        
+
         X_train = train.loc[train_index]
         y_train = train.loc[train_index,"median_relevance"]
 
         X_test = train.loc[test_index]
         y_test = train.loc[test_index, "median_relevance"]
 
-        #Extract features for simple bag of words 
-        #models useful in ensembling
+        # #Extract features for simple bag of words
+        # #models useful in ensembling
         bow_v1_features = extract_bow_v1_features(X_train, X_test)
         bow_v1_kfold_trian_test.append(bow_v1_features)
         bow_v2_features = extract_bow_v2_features(X_train, X_test, test_contains_labels = True)
         bow_v2_kfold_trian_test.append(bow_v2_features)
-        
-        #Add/extract new variables to train and test
+
+        # #Add/extract new variables to train and test
         extract(X_train, X_test)
-        #Add them to the list
+        # #Add them to the list
         kfold_train_test.append((X_train, y_train, X_test, y_test))
 
     #Pickle data for use in StratifiedKFold analysis
@@ -350,15 +351,44 @@ if __name__ == '__main__':
     cPickle.dump(bow_v2_kfold_trian_test, open('bow_v2_kfold_trian_test.pkl', 'w'))
 
     #Now, extract features for the full train and test sets.
+    #It's not bag of words, it's just the the string of "descripion and query and title"
     print "Extracting bag of words v1 features"
     bow_v1_features = extract_bow_v1_features(train, test)
     cPickle.dump(bow_v1_features, open('bow_v1_features_full_dataset.pkl', 'w'))
     
-    print "Extracting bag of words v2 features"
+    # print "Extracting bag of words v2 features"
+    # it's bag of words. but be careful, they add "q" in the beginning of query
+    # and the "z" in the beginning of title
     bow_v2_features = extract_bow_v2_features(train, test)
     cPickle.dump(bow_v2_features, open('bow_v2_features_full_dataset.pkl', 'w'))
     
     #Extract variables for full train and test set
     extract(train, test)
     cPickle.dump(train, open('train_extracted_df.pkl', 'w'))
-    cPickle.dump(test, open('test_extracted_df.pkl', 'w'))  
+    cPickle.dump(test, open('test_extracted_df.pkl', 'w'))
+    #what's the extract do?
+    #Actually they take "query_tokens_in_title",
+    #let's look at what's the "query_tokens_in_title": first split query, for example
+    #"Nike kobi"  == "Nike","kobi". then please look at this formula:
+    # float(len(query.intersection(title)))/float(len(title))
+    #Now I think you understand what'the features they choose.
+    # In fact, they choose more features. I will list below:
+    # "query_tokens_in_title", float(len(query.intersection(title)))/float(len(title)))
+    # "percent_query_tokens_in_title"
+    # "query_tokens_in_description"
+    # "percent_query_tokens_in_description"
+    # "query_length"
+    # "description_length"
+    # "title_length"
+    # "two_grams_in_q_and_t", len(two_grams_in_query.intersection(two_grams_in_title)))
+    # "two_grams_in_q_and_d", len(two_grams_in_query.intersection(two_grams_in_description)))
+    #now we have 10 features right? but it's not enough, we will make more
+    # "q_mean_of_training_relevance"
+    # "q_median_of_training_relevance"
+    # "avg_relevance_variance"
+    # for example: for a row "35", the query is "Nike"
+    # you have to calculate the similarities/total numbers of appearances
+    # {1: {1: [0, 0], 2: [0, 0]}, 2: {1: [0, 0], 2: [0, 0]}, 3: {1: [0, 0], 2: [0, 0]}, 4: {1: [0, 0], 2: [0, 0]}}
+    # It's really hard to tell this, I will tell that in the chinese
+    #total features = 4*2*3 + 3 = 27
+    # we have 27+10 featurs I think
